@@ -16,6 +16,8 @@ export interface CreateEmployeeData {
   startDate: Date;
 }
 
+export type UpdateEmployeeData = CreateEmployeeData;
+
 export type EmployeeSortField =
   | 'fullName'
   | 'email'
@@ -121,5 +123,12 @@ export class EmployeeRepository {
       page: params.page,
       limit: params.limit,
     };
+  }
+
+  async update(id: string, data: UpdateEmployeeData): Promise<Employee> {
+    return this.prisma.employee.update({
+      where: { id },
+      data,
+    });
   }
 }
