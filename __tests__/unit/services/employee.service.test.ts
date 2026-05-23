@@ -83,5 +83,24 @@ describe('EmployeeService', () => {
       expect(result).toEqual(employee);
       expect(repository.create).toHaveBeenCalledWith(data);
     });
+
+    it('should throw ConflictError when email is already taken', async () => {
+      const data = buildCreateData();
+      const existing = buildEmployee({ email: data.email });
+      repository.findAll.mockResolvedValue({
+        data: [existing],
+        total: 1,
+        page: 1,
+        limit: 1,
+      });
+
+      await expect(service.createEmployee(data)).rejects.toMatchObject({
+        name: 'ConflictError',
+        statusCode: 409,
+        code: 'CONFLICT',
+        message: `Employee with email '${data.email}' already exists`,
+      });
+      expect(repository.create).not.toHaveBeenCalled();
+    });
   });
 });
