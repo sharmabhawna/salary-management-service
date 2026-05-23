@@ -316,4 +316,15 @@ describe('EmployeeRepository', () => {
       );
     });
   });
+
+  describe('delete', () => {
+    it('should delete the employee', async () => {
+      const created = await repository.create(buildEmployeeData());
+
+      await repository.delete(created.id);
+
+      const employee = await repository.findById(created.id);
+      expect(employee).toBeNull();
+    });
+  });
 });
