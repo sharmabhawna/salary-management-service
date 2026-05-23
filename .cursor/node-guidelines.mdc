@@ -93,7 +93,7 @@ if (!user) throw new NotFoundError('User', id);
 
 - **Unit tests**: test services and repositories in isolation — inject mocks via constructor
 - **Integration tests**: use `supertest` against `createApp()` — never start the real server
-- Test file lives next to the file it tests: `user.service.ts` → `user.service.test.ts`
+- All test files live in `__tests__/` mirroring the `src/` structure — `src/errors/AppError.ts` → `__tests__/errors/AppError.test.ts`
 - Use `jest.fn()` for mocks — type them properly: `jest.fn() as jest.MockedFunction<typeof someFunction>`
 - Never mock Prisma directly in service tests — mock the repository instead
 
@@ -117,9 +117,14 @@ src/
 ├── middleware/     errorHandler.ts, (auth.ts, etc.)
 ├── routes/         user.routes.ts
 ├── controllers/    user.controller.ts
-├── services/       user.service.ts + user.service.test.ts
-├── repositories/   user.repository.ts + user.repository.test.ts
-└── __tests__/      integration tests (health.test.ts, etc.)
+├── services/       user.service.ts
+├── repositories/   user.repository.ts
+└── __tests__/      all tests, mirroring src/ structure
+    ├── errors/         AppError.test.ts
+    ├── middleware/     errorHandler.test.ts
+    ├── services/       user.service.test.ts
+    ├── repositories/   user.repository.test.ts
+    └── health.test.ts  top-level integration tests
 ```
 
 - `camelCase` for files, `PascalCase` for classes
