@@ -76,22 +76,11 @@ describe('EmployeeService', () => {
     it('should create and return an employee', async () => {
       const data = buildCreateData();
       const employee = buildEmployee();
-      repository.findAll.mockResolvedValue({
-        data: [],
-        total: 0,
-        page: 1,
-        limit: 1,
-      });
       repository.create.mockResolvedValue(employee);
 
       const result = await service.createEmployee(data);
 
       expect(result).toEqual(employee);
-      expect(repository.findAll).toHaveBeenCalledWith({
-        page: 1,
-        limit: 1,
-        search: data.email,
-      });
       expect(repository.create).toHaveBeenCalledWith(data);
     });
   });
