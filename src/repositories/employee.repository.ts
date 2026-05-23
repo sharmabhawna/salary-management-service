@@ -17,4 +17,8 @@ export class EmployeeRepository {
   async create(data: CreateEmployeeData): Promise<Employee> {
     return this.prisma.employee.create({ data });
   }
+
+  async findById(id: string): Promise<Employee | null> {
+    return this.prisma.employee.findUnique({ where: { id } });
+  }
 }
