@@ -1,0 +1,89 @@
+---
+description: TDD workflow, incremental commits, and coverage gates
+globs: ["**/*.ts", "**/*.test.ts", "**/*.spec.ts"]
+alwaysApply: true
+---
+
+# TDD Process Rules
+
+## 🔴 Red → Green → Refactor — Non-Negotiable
+
+Every code change, no matter how small, must follow this cycle.
+
+### Step 1 — Red
+- Write a failing test that defines the exact behaviour you want.
+- Run the test and confirm it fails **for the right reason**.
+  - Wrong error message = your test is asserting the wrong thing — fix it first.
+  - Test passes immediately without implementation = your test is broken — fix it first.
+- Do not write any production code yet.
+
+### Step 2 — Green
+- Write the **minimum** code to make the failing test pass.
+- Ugly is fine. Hardcoded is fine. Correct is the only goal right now.
+- No speculative code. No "while I'm here" additions.
+- Run the full test suite — not just the new test.
+
+### Step 3 — Refactor
+- Clean up the implementation and the test.
+- Extract functions, rename variables, simplify logic.
+- Tests must stay green after **every** individual refactor step.
+- If tests break during refactor, undo the last step — don't debug forward.
+
+---
+
+## 🚫 Hard Rules
+
+- Never write production code without a failing test that demands it.
+- Never write more production code than what the current failing test requires.
+- Never commit with a failing test.
+- `it.skip`, `xit`, `test.skip`, `describe.skip` are **forbidden** unless the line includes a comment with a ticket/issue reference.
+- `/* istanbul ignore */` is **forbidden** except for provably unreachable defensive branches — must be justified inline.
+
+---
+
+## 📦 Incremental Commits — Show the TDD Story
+
+Each commit = one TDD step. Never batch test + implementation + refactor into one commit.
+
+### Commit at each of these checkpoints
+
+| Step | Example commit message |
+|---|---|
+| Failing test added | `test: add failing test for createUser — duplicate email` |
+| Minimal implementation | `feat: reject duplicate email in createUser` |
+| Refactor complete | `refactor: extract isDuplicateEmail into UserRepository` |
+| Edge case covered | `test: handle null email input in createUser` |
+| Bug fixed | `fix: createUser throws ConflictError instead of 500 on duplicate` |
+
+### Commit Message Format (Conventional Commits)
+```
+<type>(<scope>): <short description>
+```
+**Types:** `feat` `fix` `test` `refactor` `chore` `docs` `perf`
+
+---
+
+## ✅ Pre-Commit Gate
+
+**Never commit if any of these are true:**
+
+- [ ] Any test is failing
+- [ ] Coverage has dropped below threshold (`npm run test:coverage` to verify)
+- [ ] New production code exists without a corresponding test
+- [ ] A `console.log` was left in production code
+- [ ] A `.only` or `.skip` modifier is present on any test
+
+---
+
+## 📊 Coverage Thresholds
+
+Configured in `jest.config.mts` — do not lower these:
+
+```
+branches:   80%
+functions:  80%
+lines:      80%
+statements: 80%
+```
+
+Coverage must **never regress** between commits. Meaningful branch coverage matters more than 100% line coverage.

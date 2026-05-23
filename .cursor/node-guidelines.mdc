@@ -1,0 +1,148 @@
+---
+description: Node.js + TypeScript coding guidelines for this project
+globs: ["**/*.ts", "!**/*.test.ts", "!**/*.spec.ts"]
+alwaysApply: true
+---
+
+# Node.js + TypeScript Guidelines
+
+## 🏗️ Architecture — Layer Responsibilities
+
+This project follows a strict layered architecture. Each layer has one job:
+
+```
+Request → Router → Controller → Service → Repository → Prisma
+```
+
+| Layer | Responsibility | What it must NOT do |
+|---|---|---|
+| **Router** | Map HTTP verbs + paths to controller methods | Any logic |
+| **Controller** | Parse request, call service, send response | Business logic, DB access |
+| **Service** | Own all business logic | Import Prisma directly |
+| **Repository** | All Prisma/DB access | Business logic |
+| **Middleware** | Cross-cutting concerns (auth, logging, errors) | Business logic |
+
+- Dependency injection always — pass repositories into services, don't instantiate inside
+- This makes every layer unit-testable in isolation with a simple mock
+
+```ts
+// ✅ Good — injectable
+class UserService {
+  constructor(private readonly userRepository: UserRepository) {}
+}
+
+// ❌ Bad — tightly coupled, untestable
+class UserService {
+  private repo = new UserRepository();
+}
+```
+
+---
+
+## 🔷 TypeScript — Strict Mode
+
+`strict: true` is enabled. Respect it.
+
+- **No `any`** — use `unknown` and narrow it, or define a proper type/interface
+- **No type assertions (`as X`)** unless you can justify it in a comment
+- All function parameters and return types must be explicitly typed
+- Use `interface` for object shapes that may be extended; `type` for unions, intersections, utility types
+- Prefer `readonly` on properties that should not be mutated
+
+```ts
+// ❌ Bad
+function processData(data: any) { ... }
+
+// ✅ Good
+function processData(data: unknown): ProcessedResult {
+  if (!isValidData(data)) throw new ValidationError('Invalid data shape');
+  // narrow and use
+}
+```
+
+---
+
+## ⚠️ Error Handling
+
+- Use the error classes in `src/errors/AppError.ts` — `NotFoundError`, `ValidationError`, `ConflictError`
+- Create new named subclasses for domain-specific errors as needed
+- **Never throw generic `new Error('...')`** in services or repositories
+- **Never swallow errors** — empty `catch` blocks are forbidden
+- The global `errorHandler` middleware in `src/middleware/errorHandler.ts` handles HTTP responses — don't `res.status()` in catch blocks
+
+```ts
+// ❌ Bad
+if (!user) throw new Error('not found');
+
+// ✅ Good
+if (!user) throw new NotFoundError('User', id);
+```
+
+---
+
+## ⚡ Async / Promises
+
+- Always `async/await` — no `.then()/.catch()` chains
+- Never fire-and-forget a Promise unless explicitly intentional with a comment
+- Use `Promise.all` for concurrent independent async operations
+- Every async function must have a typed return: `Promise<User>`, not just `Promise<any>`
+
+---
+
+## 🧪 Testing Patterns
+
+- **Unit tests**: test services and repositories in isolation — inject mocks via constructor
+- **Integration tests**: use `supertest` against `createApp()` — never start the real server
+- Test file lives next to the file it tests: `user.service.ts` → `user.service.test.ts`
+- Use `jest.fn()` for mocks — type them properly: `jest.fn() as jest.MockedFunction<typeof someFunction>`
+- Never mock Prisma directly in service tests — mock the repository instead
+
+```ts
+// ✅ Correct test isolation
+const mockUserRepository = {
+  findById: jest.fn(),
+  create: jest.fn(),
+};
+const userService = new UserService(mockUserRepository);
+```
+
+---
+
+## 📁 File Naming & Structure
+
+```
+src/
+├── config/         env.ts, prisma.ts
+├── errors/         AppError.ts (and subclasses)
+├── middleware/     errorHandler.ts, (auth.ts, etc.)
+├── routes/         user.routes.ts
+├── controllers/    user.controller.ts
+├── services/       user.service.ts + user.service.test.ts
+├── repositories/   user.repository.ts + user.repository.test.ts
+└── __tests__/      integration tests (health.test.ts, etc.)
+```
+
+- `camelCase` for files, `PascalCase` for classes
+- One class per file
+- Named exports only — no default exports
+
+---
+
+## 🔧 Config & Environment
+
+- All env vars are validated and exported from `src/config/env.ts`
+- Never access `process.env.X` outside of `src/config/env.ts`
+- Never hardcode ports, URLs, secrets, or DB paths
+
+---
+
+## 🚫 Always Forbidden
+
+- `any` type
+- `console.log` in production code (use a logger or remove before committing)
+- Empty `catch` blocks
+- Default exports
+- Accessing `process.env` outside `src/config/env.ts`
+- Importing Prisma directly in a service
+- Hardcoded secrets or URLs
+- Commented-out code in commits
