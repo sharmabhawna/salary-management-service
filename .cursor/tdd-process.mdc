@@ -80,10 +80,29 @@ Each commit = one TDD step. Never batch test + implementation + refactor into on
 Configured in `jest.config.mts` — do not lower these:
 
 ```
-branches:   80%
-functions:  80%
-lines:      80%
-statements: 80%
+branches:   100%
+functions:  100%
+lines:      100%
+statements: 100%
 ```
 
 Coverage must **never regress** between commits. Meaningful branch coverage matters more than 100% line coverage.
+
+---
+
+## ⚠️ 100% Coverage Is a Constraint, Not a Goal
+
+The threshold is 100% to ensure no meaningful path goes untested. It is **not** an invitation to game the number.
+
+**Never do this to hit 100%:**
+- Write assertions that always pass regardless of behaviour (`expect(true).toBe(true)`)
+- Call a function in a test without asserting anything about its output or side effects
+- Test a one-line wrapper purely to execute its single line
+- Duplicate the implementation logic inside the test assertion
+- Use `/* istanbul ignore */` comments to skip lines instead of writing a test
+
+**Do this instead:**
+- Assert the specific output, return value, or side effect the code is supposed to produce
+- For every branch (`if`, ternary, `catch`), write a test that exercises that branch with a meaningful assertion
+- If a file genuinely cannot be unit-tested (e.g. `src/index.ts`, `src/config/prisma.ts`), exclude it explicitly in `jest.config.mts` and leave a comment in the config explaining why
+- If reaching 100% requires a meaningless test, question whether the code under test needs to exist at all
