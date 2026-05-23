@@ -284,4 +284,36 @@ describe('EmployeeRepository', () => {
       ]);
     });
   });
+
+  describe('update', () => {
+    it('should update and return the employee', async () => {
+      const created = await repository.create(buildEmployeeData());
+      const updateData = buildEmployeeData({
+        fullName: 'Jane Smith',
+        email: 'jane.smith@company.com',
+        jobTitle: 'Senior Software Engineer',
+        department: 'Platform',
+        country: 'Canada',
+        salaryCents: 150_000_00,
+        employmentType: EmploymentType.PART_TIME,
+        startDate: new Date('2025-01-01T00:00:00.000Z'),
+      });
+
+      const updated = await repository.update(created.id, updateData);
+
+      expect(updated.id).toBe(created.id);
+      expect(updated.fullName).toBe(updateData.fullName);
+      expect(updated.email).toBe(updateData.email);
+      expect(updated.jobTitle).toBe(updateData.jobTitle);
+      expect(updated.department).toBe(updateData.department);
+      expect(updated.country).toBe(updateData.country);
+      expect(updated.salaryCents).toBe(updateData.salaryCents);
+      expect(updated.employmentType).toBe(updateData.employmentType);
+      expect(updated.startDate).toEqual(updateData.startDate);
+      expect(updated.createdAt).toEqual(created.createdAt);
+      expect(updated.updatedAt.getTime()).toBeGreaterThanOrEqual(
+        created.updatedAt.getTime(),
+      );
+    });
+  });
 });
