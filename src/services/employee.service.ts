@@ -1,4 +1,5 @@
 import { Employee } from '@prisma/client';
+import { ConflictError } from '@/errors/AppError.js';
 import {
   CreateEmployeeData,
   FindAllEmployeesParams,
@@ -20,6 +21,28 @@ export class EmployeeService {
   ) {}
 
   async createEmployee(data: CreateEmployeeData): Promise<Employee> {
+    await this.ensureEmailAvailable(data.email);
     return this.employeeRepository.create(data);
+  }
+
+  private async ensureEmailAvailable(
+    email: string,
+    excludeId?: string,
+  ): Promise<void> {
+    const result = await this.employeeRepository.findAll({
+      page: 1,
+      limit: 1,
+      search: email,
+    });
+
+    const duplicate = result.data.find(
+      (employee) =>
+        employee.email === email &&
+        (excludeId === undefined || employee.id !== excludeId),
+    );
+
+    if (duplicate !== undefined) {
+      throw new ConflictError(`Employee with email '${email}' already exists`);
+    }
   }
 }
