@@ -131,4 +131,8 @@ export class EmployeeRepository {
       data,
     });
   }
+
+  async delete(id: string): Promise<void> {
+    await this.prisma.employee.delete({ where: { id } });
+  }
 }
