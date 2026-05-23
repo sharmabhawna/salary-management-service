@@ -5,3 +5,28 @@ generator client {
 datasource db {
   provider = "sqlite"
 }
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+}
+
+model Employee {
+  id              String          @id @default(uuid())
+  fullName        String
+  email           String          @unique
+  jobTitle        String
+  department      String
+  country         String
+  salaryCents     Int
+  employmentType  EmploymentType
+  startDate       DateTime
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([country])
+  @@index([department])
+  @@index([jobTitle])
+  @@index([employmentType])
+}
