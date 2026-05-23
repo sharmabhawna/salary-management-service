@@ -68,4 +68,20 @@ describe('EmployeeRepository', () => {
       expect(employee.updatedAt).toBeInstanceOf(Date);
     });
   });
+
+  describe('findById', () => {
+    it('should return the employee when found', async () => {
+      const created = await repository.create(buildEmployeeData());
+
+      const employee = await repository.findById(created.id);
+
+      expect(employee).toEqual(created);
+    });
+
+    it('should return null when the employee is not found', async () => {
+      const employee = await repository.findById('non-existent-id');
+
+      expect(employee).toBeNull();
+    });
+  });
 });
