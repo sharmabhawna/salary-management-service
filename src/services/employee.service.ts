@@ -19,6 +19,14 @@ export interface EmployeeRepositoryContract {
   delete(id: string): Promise<void>;
 }
 
+export interface EmployeeServiceContract {
+  createEmployee(data: CreateEmployeeData): Promise<Employee>;
+  getEmployee(id: string): Promise<Employee>;
+  listEmployees(params: FindAllEmployeesParams): Promise<PaginatedEmployees>;
+  updateEmployee(id: string, data: UpdateEmployeeData): Promise<Employee>;
+  deleteEmployee(id: string): Promise<void>;
+}
+
 const REQUIRED_STRING_FIELDS = [
   'fullName',
   'email',
@@ -27,7 +35,7 @@ const REQUIRED_STRING_FIELDS = [
   'country',
 ] as const;
 
-export class EmployeeService {
+export class EmployeeService implements EmployeeServiceContract {
   constructor(
     private readonly employeeRepository: EmployeeRepositoryContract,
   ) {}
