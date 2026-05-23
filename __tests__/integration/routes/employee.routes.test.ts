@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import request from 'supertest';
 import { Employee, EmploymentType } from '@prisma/client';
-import { ConflictError, NotFoundError, ValidationError } from '@/errors/AppError.js';
+import { ConflictError, NotFoundError } from '@/errors/AppError.js';
 import { createApp } from '@/app.js';
 import {
   CreateEmployeeData,
@@ -223,6 +223,23 @@ describe('GET /api/employees', () => {
       employmentType: EmploymentType.FULL_TIME,
       search: 'jane',
     });
+  });
+
+  it('should return 400 when query params are invalid', async () => {
+    const app = createApp({ employeeService });
+
+    const response = await request(app).get('/api/employees').query({
+      page: 'abc',
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'page must be a positive integer',
+      },
+    });
+    expect(employeeService.listEmployees).not.toHaveBeenCalled();
   });
 });
 
