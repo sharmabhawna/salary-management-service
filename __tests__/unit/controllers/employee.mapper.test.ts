@@ -6,6 +6,7 @@ import {
   mapUpdateBodyToServiceData,
   parseEmployeeRequestBody,
   parseListEmployeesQuery,
+  parseRequiredRouteParam,
 } from '@/controllers/employee.mapper.js';
 
 const validBody = {
@@ -191,6 +192,30 @@ describe('parseListEmployeesQuery', () => {
       new ValidationError(
         'employmentType must be FULL_TIME, PART_TIME, or CONTRACT',
       ),
+    );
+  });
+});
+
+describe('parseRequiredRouteParam', () => {
+  it('should return a trimmed route param', () => {
+    expect(parseRequiredRouteParam({ id: '  emp-1  ' }, 'id')).toBe('emp-1');
+  });
+
+  it('should throw when route param is missing', () => {
+    expect(() => parseRequiredRouteParam({}, 'id')).toThrow(
+      new ValidationError('id is required'),
+    );
+  });
+
+  it('should throw when route param is empty', () => {
+    expect(() => parseRequiredRouteParam({ id: '   ' }, 'id')).toThrow(
+      new ValidationError('id is required'),
+    );
+  });
+
+  it('should throw when route param is an array', () => {
+    expect(() => parseRequiredRouteParam({ id: ['emp-1'] }, 'id')).toThrow(
+      new ValidationError('id is required'),
     );
   });
 });

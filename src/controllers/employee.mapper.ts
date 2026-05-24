@@ -263,6 +263,19 @@ function parseEmploymentTypeQuery(value: unknown): EmploymentType | undefined {
   return value as EmploymentType;
 }
 
+export function parseRequiredRouteParam(
+  params: Record<string, string | string[] | undefined>,
+  field: string,
+): string {
+  const value = params[field];
+
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new ValidationError(`${field} is required`);
+  }
+
+  return value.trim();
+}
+
 export function parseListEmployeesQuery(
   query: Record<string, unknown>,
 ): FindAllEmployeesParams {

@@ -5,6 +5,7 @@ import {
   mapUpdateBodyToServiceData,
   parseEmployeeRequestBody,
   parseListEmployeesQuery,
+  parseRequiredRouteParam,
 } from '@/controllers/employee.mapper.js';
 import { EmployeeServiceContract } from '@/services/employee.service.js';
 
@@ -56,7 +57,9 @@ export class EmployeeController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const employee = await this.employeeService.getEmployee(req.params.id);
+      const employee = await this.employeeService.getEmployee(
+        parseRequiredRouteParam(req.params, 'id'),
+      );
       res.status(200).json({ data: mapEmployeeToResponse(employee) });
     } catch (error) {
       next(error);
@@ -71,7 +74,7 @@ export class EmployeeController {
     try {
       const body = parseEmployeeRequestBody(req.body);
       const employee = await this.employeeService.updateEmployee(
-        req.params.id,
+        parseRequiredRouteParam(req.params, 'id'),
         mapUpdateBodyToServiceData(body),
       );
 
@@ -87,7 +90,9 @@ export class EmployeeController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      await this.employeeService.deleteEmployee(req.params.id);
+      await this.employeeService.deleteEmployee(
+        parseRequiredRouteParam(req.params, 'id'),
+      );
       res.status(204).send();
     } catch (error) {
       next(error);
