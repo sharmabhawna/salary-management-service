@@ -9,7 +9,7 @@ Backend REST API for the Salary Management System. HR teams use it to manage emp
 - **Prisma 7** — ORM with SQLite (`better-sqlite3` adapter)
 - **Jest** — test runner
 - **Supertest** — HTTP integration testing
-- **Husky** — pre-commit hooks (lint + 100% coverage gate)
+- **Husky** — pre-commit hooks (100% coverage gate)
 
 ## Features
 
@@ -56,13 +56,16 @@ To use the UI, start the [salary-management-portal](../salary-management-portal)
 |---|---|
 | `npm run dev` | Start development server with hot reload |
 | `npm test` | Run tests |
+| `npm run test:watch` | Run tests in watch mode |
 | `npm run test:coverage` | Run tests with coverage report (100% threshold) |
 | `npm run build` | Compile TypeScript to `dist/` |
-| `npm start` | Run compiled production build |
+| `npm start` | Run compiled production build (see note below) |
 | `npm run db:generate` | Generate Prisma client (runs automatically on `npm install`) |
 | `npm run db:migrate` | Run database migrations |
-| `npm run db:seed` | Seed database with 10,000 employees |
+| `npm run db:seed` | Seed database with 10,000 employees (destructive — truncates existing data) |
 | `npm run db:studio` | Open Prisma Studio |
+
+> **Note on `npm start`:** A `prestart` lifecycle hook runs automatically before `node dist/index.js`. It executes `prisma migrate deploy && npm run db:seed`, which applies pending migrations and **truncates and re-seeds the database with 10,000 employees on every start**. This is intentional for a demo deployment. If you want to preserve data between restarts, run `node dist/index.js` directly.
 
 ## API Reference
 
@@ -146,9 +149,15 @@ This project follows strict TDD — every change follows Red → Green → Refac
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|---|---|---|
-| `DATABASE_URL` | SQLite database file path | `file:./dev.db` |
-| `PORT` | Port the server listens on | `3000` |
-| `NODE_ENV` | Environment | `development` |
-| `CORS_ORIGIN` | Allowed origin for CORS (leave unset in local dev to allow all origins) | — |
+| Variable | Required | Description | `.env.example` value |
+|---|---|---|---|
+| `DATABASE_URL` | **Yes** | SQLite database file path. The server throws on startup if missing — must be set in `.env`. | `file:./dev.db` |
+| `PORT` | **Yes** | Port the server listens on. The server throws on startup if missing — must be set in `.env`. | `3000` |
+| `NODE_ENV` | No | Environment name | `development` |
+| `CORS_ORIGIN` | No | Allowed origin for CORS. Leave unset in local dev to allow all origins. | _(unset)_ |
+
+Copy `.env.example` to `.env` before running the server — this satisfies the two required variables with sensible local defaults:
+
+```bash
+cp .env.example .env
+```
