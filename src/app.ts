@@ -29,7 +29,10 @@ export function createApp(options: CreateAppOptions = {}) {
 
   app.use(helmet());
 
-  const corsOrigin = process.env.CORS_ORIGIN?.replace(/\/+$/, '');
+  const corsOrigin = process.env.CORS_ORIGIN
+    ?.replace(/^["']+|["']+$/g, '')
+    .replace(/\/+$/, '')
+    || undefined;
   app.use(
     cors(corsOrigin ? { origin: corsOrigin } : undefined),
   );
