@@ -523,13 +523,168 @@ See [PUT vs PATCH trade-offs](#put-vs-patch-trade-offs) below for the full compa
 
 ---
 
+## 7. Architecture Overview
+
+### System Context
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Browser                                                             │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  salary-management-portal  (React 19 + Vite, :5173)           │ │
+│  │                                                                │ │
+│  │  EmployeeList ───────────────────── InsightsDashboard         │ │
+│  │       │                                    │                  │ │
+│  │  useEmployees                        useInsights              │ │
+│  │       │                                    │                  │ │
+│  │  employeeService                  insightsService             │ │
+│  │       └──────────────────┬───────────────────┘               │ │
+│  │                       apiClient                               │ │
+│  └────────────────────────────┬───────────────────────────────── ┘ │
+└───────────────────────────────┼──────────────────────────────────── ┘
+                                │  HTTP /api/*
+                                │  (Vite proxy in dev → localhost:3000)
+                                │  (VITE_API_URL env var in production)
+                                ▼
+             ┌──────────────────────────────────────┐
+             │  salary-management-service           │
+             │  (Express 5 + TypeScript, :3000)     │
+             │                                      │
+             │  Routes → Controllers → Services     │
+             │              → Repositories          │
+             └──────────────────┬───────────────────┘
+                                │  Prisma 7 + better-sqlite3 adapter
+                                ▼
+                     ┌──────────────────┐
+                     │     SQLite       │
+                     │    (dev.db)      │
+                     └──────────────────┘
+```
+
+### Service Request Flow
+
+```
+HTTP Request
+     │
+     ▼
+Express Router  (employee.routes.ts / insights.routes.ts)
+     │
+     ▼
+Controller
+├── Parses & validates input via employee.mapper.ts
+│   (query params, body fields, dollars → cents conversion)
+├── Calls service with typed parameters
+└── Sends JSON response with envelope { data, ... }
+     │
+     ▼
+Service
+├── Enforces business rules
+│   ├── Required field validation (employee.service.ts)
+│   ├── Email uniqueness (search before create / update)
+│   ├── Not-found / conflict detection → throws AppError subclass
+│   └── Empty-state messages for filtered insight queries (insights.service.ts)
+└── Converts salaryCents ↔ salary dollars at service boundary
+     │
+     ▼
+Repository
+├── Builds Prisma where / orderBy / skip / take from typed params
+├── employee.repository.ts  →  findMany, count, findById, create, update, delete
+└── insights.repository.ts  →  aggregate (min/max/avg), groupBy (dept/country)
+     │
+     ▼
+Prisma Client  (PrismaBetterSqlite3 adapter, singleton in src/config/prisma.ts)
+     │
+     ▼
+SQLite file  (path from DATABASE_URL env var)
+```
+
+### Error Propagation
+
+```
+Service throws AppError subclass
+(NotFoundError 404 / ValidationError 400 / ConflictError 409)
+     │
+     ▼
+Express error middleware  (errorHandler.ts)
+├── AppError  →  { error: { code, message } }  +  matching HTTP status
+└── Unknown   →  { error: { code: "INTERNAL_SERVER_ERROR",
+                             message: "Internal server error" } }  +  500
+```
+
+### Dependency Injection and Test Seams
+
+```
+Production wiring (app.ts)           Test wiring (route integration tests)
+─────────────────────────            ─────────────────────────────────────
+new EmployeeRepository(prisma)       new EmployeeRepository(testPrisma)
+        │                                        │
+new EmployeeService(repo)            plain mock { findById: jest.fn(), … }
+        │                                        │
+EmployeeController(service)          EmployeeService(mockRepo)
+        │                                        │
+router.post('/', controller.create)  Same controller — no code change needed
+```
+
+---
+
+## 8. Performance Considerations
+
+### Query Performance
+
+| Query type | Mechanism | Expected latency (10 k rows) |
+|---|---|---|
+| Paginated list (no filters) | `findMany` + `count` with `skip/take` | < 5 ms |
+| List with filters | `WHERE country = ? AND department = ?` hitting indexes | < 5 ms |
+| Full-text search on name/email | `LIKE '%term%'` — no index, full scan | 5–20 ms |
+| Salary min/max/avg by country | `aggregate` on indexed `country` column | < 5 ms |
+| Average salary by job title | `aggregate` with `country` + `jobTitle` index | < 5 ms |
+| Dept salary groupBy | `groupBy department` across all rows | < 10 ms |
+| Headcount by country | `groupBy country` across all rows | < 5 ms |
+
+Index rationale: `country`, `department`, `jobTitle`, and `employmentType` are indexed (see schema). The `search` param uses `LIKE '%term%'` which cannot use a B-tree index — acceptable at 10 k rows (full scan < 20 ms on local SSD); an FTS5 virtual table would be needed for sub-ms search at 100 k+ rows.
+
+### Pagination
+
+- Default page size: **20 rows**. Max: **100** (enforced in service). Prevents accidental full-table HTTP responses.
+- Two Prisma calls per list request: `count({ where })` then `findMany({ where, skip, take })`. At this scale both are fast enough that the extra round-trip is negligible vs. adding cursor-based pagination complexity.
+- `total` is returned in every response so the portal can render page counts without a second request.
+
+### Seed Performance
+
+See [section 5](#5-seed-strategy) for a full breakdown. Summary:
+
+| Phase | Duration |
+|---|---|
+| Generate 10,000 in-memory records | < 50 ms |
+| 20 × `createMany(500)` in one transaction | 500 ms – 1.5 s |
+| **Total** | **< 2 s** |
+
+`createMany` in batches of 500 keeps SQLite well under its SQLITE_MAX_VARIABLE_NUMBER limit (default 999) while minimising fsync overhead.
+
+### Test Performance
+
+| Test type | Isolation | Typical duration |
+|---|---|---|
+| Unit (service, controller, mapper) | Mocked repositories — no I/O | < 5 ms each |
+| Integration — routes | Mocked services via app factory | < 20 ms each |
+| Integration — repositories | Real SQLite (`test.db` / `insights-test.db`) | 50–200 ms per suite |
+
+Repository integration tests call `prisma migrate deploy` once before the suite. Separate DB files per test module prevent cross-suite state leakage without needing `beforeEach` truncation.
+
+### Production (Railway Ephemeral SQLite)
+
+- Container start: `prestart` runs migrate (near-instant on already-migrated DB) + seed (< 2 s) before Node process starts.
+- After seed, SQLite's page cache is empty. The first insight query performs a cold read of the 2 MB database file into the page cache; subsequent queries are served from memory.
+- Write concurrency: SQLite allows one writer at a time (WAL mode not enabled). For a single HR manager performing sequential CRUD operations this is not a bottleneck. For concurrent write traffic → PostgreSQL.
+
+---
+
 ## Open Questions / Future Updates
 
-Items to resolve during implementation and record here:
-
-- [ ] Finalize seed data pools (countries, departments, job titles, salary tiers)
-- [ ] Portal API base URL configuration (`VITE_API_URL`)
-- [ ] Extend insight responses with headcount or other fields if HR analytics requirements grow
+- [x] Finalize seed data pools (countries, departments, job titles, salary tiers) — implemented in `prisma/seed.ts`; uses fixed pools for departments, countries, job titles, and employment types with deterministic index-based selection.
+- [x] Portal API base URL configuration (`VITE_API_URL`) — `VITE_API_URL` env var in portal; defaults to `/api` (proxied to port 3000 in dev); set to full Railway URL for production.
+- [ ] Extend insight responses with headcount or other fields if HR analytics requirements grow — currently out of scope; revisit if additional aggregations are needed.
 
 ---
 
