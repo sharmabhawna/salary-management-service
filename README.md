@@ -25,18 +25,16 @@ Backend REST API for the Salary Management System. HR teams use it to manage emp
 ## Prerequisites
 
 - Node.js v20+
+- Git (required for Husky pre-commit hooks)
 
 ## Getting Started
 
 ```bash
-# Install dependencies
+# Install dependencies (also auto-generates the Prisma client via postinstall)
 npm install
 
 # Copy environment variables
 cp .env.example .env
-
-# Generate Prisma client
-npm run db:generate
 
 # Run database migrations
 npm run db:migrate
@@ -61,7 +59,7 @@ To use the UI, start the [salary-management-portal](../salary-management-portal)
 | `npm run test:coverage` | Run tests with coverage report (100% threshold) |
 | `npm run build` | Compile TypeScript to `dist/` |
 | `npm start` | Run compiled production build |
-| `npm run db:generate` | Generate Prisma client |
+| `npm run db:generate` | Generate Prisma client (runs automatically on `npm install`) |
 | `npm run db:migrate` | Run database migrations |
 | `npm run db:seed` | Seed database with 10,000 employees |
 | `npm run db:studio` | Open Prisma Studio |
@@ -112,7 +110,7 @@ src/
 ├── services/       Business logic
 ├── app.ts          Express app factory
 └── index.ts        Server entry point
-tests/              Unit and integration tests (mirrors src/)
+__tests__/          Unit and integration tests (mirrors src/)
 prisma/
 ├── schema.prisma   Database schema
 ├── seed.ts         Seed script
@@ -153,3 +151,4 @@ This project follows strict TDD — every change follows Red → Green → Refac
 | `DATABASE_URL` | SQLite database file path | `file:./dev.db` |
 | `PORT` | Port the server listens on | `3000` |
 | `NODE_ENV` | Environment | `development` |
+| `CORS_ORIGIN` | Allowed origin for CORS (leave unset in local dev to allow all origins) | — |
