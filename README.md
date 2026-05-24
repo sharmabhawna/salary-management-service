@@ -134,14 +134,17 @@ The `Employee` model stores:
 
 | Field | Type | Notes |
 |---|---|---|
+| `id` | string (UUID) | Primary key, auto-generated |
 | `fullName` | string | Employee display name |
 | `email` | string | Unique |
 | `jobTitle` | string | Indexed for insight queries |
 | `department` | string | Indexed |
 | `country` | string | Indexed |
-| `salaryCents` | int | Salary stored in cents |
+| `salary` | number | Exposed as USD dollars in API responses; stored as `salaryCents` (integer cents) internally |
 | `employmentType` | enum | `FULL_TIME`, `PART_TIME`, `CONTRACT` |
-| `startDate` | datetime | Employment start date |
+| `startDate` | string | ISO 8601 date, e.g. `2024-03-15` |
+| `createdAt` | string | ISO 8601 timestamp, set on insert |
+| `updatedAt` | string | ISO 8601 timestamp, updated on every change |
 
 ## Development Approach
 

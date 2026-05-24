@@ -24,7 +24,7 @@
 | `createdAt` | `DateTime` | Required, set on insert | Audit trail — when the record entered the system. |
 | `updatedAt` | `DateTime` | Required, updated on every change | Audit trail — when the record was last modified. |
 
-### Prisma Schema (planned)
+### Prisma Schema
 
 ```prisma
 enum EmploymentType {
@@ -313,7 +313,7 @@ No required query params. Returns all countries sorted by headcount descending.
 | **Calculation** | `SELECT country, COUNT(*) FROM Employee GROUP BY country ORDER BY COUNT(*) DESC` |
 | **Endpoint** | `GET /api/insights/headcount/country` |
 
-**Implementation note:** Aggregations live in `EmployeeRepository` (or a dedicated `InsightsRepository` if query complexity warrants separation). The service layer converts cent values to dollar floats with two decimal places. When a filtered insight query matches zero rows, the service returns `{ data: null, message: "..." }` with `200 OK` so the portal can display a human-readable empty state without treating it as an error.
+**Implementation note:** Aggregations live in `InsightsRepository` (`src/repositories/insights.repository.ts`), separate from `EmployeeRepository` to keep each class focused on a single concern. The repository rounds average cent values to the nearest integer cent (`Math.round`) before returning them, so the service layer receives whole-cent values and divides by 100 to produce dollar amounts without fractional cent drift. When a filtered insight query matches zero rows, the service returns `{ data: null, message: "..." }` with `200 OK` so the portal can display a human-readable empty state without treating it as an error.
 
 ---
 
@@ -345,8 +345,16 @@ Default sort is `fullName ASC` when `sortBy` is omitted — predictable, HR-frie
 ### Filter composition
 
 1. Repository builds a Prisma `where` clause from provided filters (AND-combined).
-2. `total = await prisma.employee.count({ where })`.
-3. `data = await prisma.employee.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { [sortBy]: sortOrder } })`.
+2. `count` and `findMany` execute **in parallel** via `Promise.all` — both queries share the same `where` clause but neither blocks the other:
+
+```typescript
+const [data, total] = await Promise.all([
+  prisma.employee.findMany({ where, skip, take, orderBy }),
+  prisma.employee.count({ where }),
+]);
+```
+
+Running them concurrently halves the round-trip overhead of a sequential approach (two queries back-to-back).
 
 ### Edge cases
 
@@ -614,17 +622,37 @@ Express error middleware  (errorHandler.ts)
 
 ### Dependency Injection and Test Seams
 
+`createApp()` in `app.ts` accepts optional service overrides, giving three distinct test seams:
+
 ```
-Production wiring (app.ts)           Test wiring (route integration tests)
-─────────────────────────            ─────────────────────────────────────
-new EmployeeRepository(prisma)       new EmployeeRepository(testPrisma)
-        │                                        │
-new EmployeeService(repo)            plain mock { findById: jest.fn(), … }
-        │                                        │
-EmployeeController(service)          EmployeeService(mockRepo)
-        │                                        │
-router.post('/', controller.create)  Same controller — no code change needed
+─────────────────────────────────────────────────────────────────────────────
+PRODUCTION                ROUTE TESTS               SERVICE UNIT TESTS
+app.ts                    (integration)             (unit)
+─────────────────────────────────────────────────────────────────────────────
+                          mockService = {
+                            createEmployee: jest.fn(),
+                            listEmployees:  jest.fn(), …
+                          }
+                               │
+createApp()                createApp({               mockRepo = {
+  │                          employeeService:           create:   jest.fn(),
+  │                            mockService              findAll:  jest.fn(), …
+  │                        })                         }
+  │                               │                       │
+  EmployeeRepository(prisma)      │ (skipped)     new EmployeeService(mockRepo)
+        │                         │
+  EmployeeService(repo)      EmployeeController(mockService)
+        │                         │
+  EmployeeController(svc)    router.post('/', controller.create)
+        │
+  router.post('/', controller.create)
+
+REPOSITORY TESTS
+new EmployeeRepository(testPrismaClient)  ← real Prisma, test.db SQLite file
+─────────────────────────────────────────────────────────────────────────────
 ```
+
+Each test level isolates exactly the layer under test. Route tests never touch the database; service unit tests never touch HTTP; repository tests never test business logic.
 
 ---
 
@@ -643,6 +671,8 @@ router.post('/', controller.create)  Same controller — no code change needed
 | Headcount by country | `groupBy country` across all rows | < 5 ms |
 
 Index rationale: `country`, `department`, `jobTitle`, and `employmentType` are indexed (see schema). The `search` param uses `LIKE '%term%'` which cannot use a B-tree index — acceptable at 10 k rows (full scan < 20 ms on local SSD); an FTS5 virtual table would be needed for sub-ms search at 100 k+ rows.
+
+**Average salary rounding:** SQLite's `AVG()` returns a floating-point value in cents (e.g. `98750.333...`). The repository rounds this to the nearest integer cent with `Math.round` before returning, so the service always divides a whole number by 100. This prevents values like `$987.5033...` from reaching API responses; the result is an exact two-decimal dollar amount (e.g. `$987.50`).
 
 ### Pagination
 
